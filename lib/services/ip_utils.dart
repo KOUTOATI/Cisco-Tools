@@ -4,12 +4,15 @@ import 'dart:math' as Math; // Pour Math.log et Math.pow
 
 class IpUtils {
   // Utility Functions
+
+  /// Converts a formatted binary string by grouping bits.
   static String formatBinary(String binary, {int groupSize = 8}) {
     if (binary.isEmpty) return '';
     final RegExp regExp = RegExp('.{1,$groupSize}');
     return binary.replaceAllMapped(regExp, (Match m) => '${m[0]} ').trim();
   }
 
+  /// Validates an IPv4 address format.
   static bool validateIPv4(String ip) {
     debugPrint('   validateIPv4 called for: $ip');
     final parts = ip.split('.');
@@ -28,34 +31,35 @@ class IpUtils {
     return isValid;
   }
 
+  /// Validates an IPv6 address format.
   static bool validateIPv6(String ip) {
     debugPrint('   validateIPv6 called for: $ip');
-    // Simplified validation for debugging, your original logic is more robust
-    // but let's ensure basic parsing works.
-    if (ip.contains('::')) {
-      final parts = ip.split('::');
-      if (parts.length > 2) {
-        debugPrint('     Invalid IPv6: more than one "::"');
-        return false;
-      }
-    } else {
-      final parts = ip.split(':');
-      if (parts.length != 8) {
-        debugPrint('     Invalid IPv6: wrong number of hextets (without "::") - ${parts.length}');
+    // Check for multiple '::'
+    if (ip.split('::').length > 2) {
+      debugPrint('     Invalid IPv6: more than one "::"');
+      return false;
+    }
+
+    final parts = ip.split(':');
+    // Check for valid hextet lengths and characters
+    for (var part in parts) {
+      if (part.isEmpty) continue; // Empty part for '::'
+      if (!RegExp(r'^[0-9A-Fa-f]{1,4}$').hasMatch(part)) {
+        debugPrint('     Invalid IPv6: hextet "$part" has invalid characters or length');
         return false;
       }
     }
 
-    final isValid = ip.split(':').every((part) {
-      if (part.isEmpty) return true; // Empty part for '::' or leading/trailing ':'
-      final result = RegExp(r'^[0-9A-Fa-f]{1,4}$').hasMatch(part);
-      debugPrint('     Hextet "$part": isValid=$result');
-      return result;
-    });
-    debugPrint('   validateIPv6 result: $isValid');
-    return isValid;
+    // Basic check for number of hextets
+    if (!ip.contains('::') && parts.length != 8) {
+      debugPrint('     Invalid IPv6: wrong number of hextets (without "::") - ${parts.length}');
+      return false;
+    }
+    debugPrint('   validateIPv6 result: true');
+    return true;
   }
 
+  /// Validates a MAC address format.
   static bool validateMACAddress(String mac) {
     debugPrint('   validateMACAddress called for: $mac');
     final isValid = RegExp(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$').hasMatch(mac);
@@ -63,6 +67,7 @@ class IpUtils {
     return isValid;
   }
 
+  /// Converts an IPv4 address string to its 32-bit binary string representation.
   static String ipv4ToBinary(String ip) {
     debugPrint('   ipv4ToBinary called for: $ip');
     final binary = ip.split('.').map((octet) {
@@ -72,6 +77,7 @@ class IpUtils {
     return binary;
   }
 
+  /// Converts an IPv6 address string (expanded) to its 128-bit binary string representation.
   static String ipv6ToBinary(String ip) {
     debugPrint('   ipv6ToBinary called for: $ip');
     final binary = expandIPv6(ip).split(':').map((hextet) {
@@ -81,6 +87,7 @@ class IpUtils {
     return binary;
   }
 
+  /// Converts a 32-bit binary string to an IPv4 address string.
   static String binaryToIPv4(String binary) {
     debugPrint('   binaryToIPv4 called for: $binary');
     final cleanedBinary = binary.replaceAll(' ', '');
@@ -102,6 +109,7 @@ class IpUtils {
     return ipv4;
   }
 
+  /// Converts a 128-bit binary string to an IPv6 address string (expanded).
   static String binaryToIPv6(String binary) {
     debugPrint('   binaryToIPv6 called for: $binary');
     final cleanedBinary = binary.replaceAll(' ', '');
@@ -112,11 +120,138 @@ class IpUtils {
     debugPrint('     binaryToIPv6 - extracted hextets: $hextets');
 
     final ipv6 = hextets.map((hextet) {
-      if (hextet.isEmpty) return '0';
+      if (hextet.isEmpty) return '0'; // Should not happen with padLeft, but for safety
       return int.parse(hextet, radix: 2).toRadixString(16).padLeft(4, '0');
     }).join(':');
     debugPrint('   binaryToIPv6 result: $ipv6');
     return ipv6;
+  }
+
+  /// Converts a MAC address to its binary representation.
+  static String macToBinary(String macAddress) {
+    debugPrint('   macToBinary called for: $macAddress');
+    final binary = macAddress
+        .replaceAll(RegExp(r'[:-]'), '')
+        .split(RegExp(r'.{2}'))
+        .where((e) => e.isNotEmpty)
+        .map((hex) => int.parse(hex, radix: 16).toRadixString(2).padLeft(8, '0'))
+        .join(' ');
+    debugPrint('   macToBinary result: $binary');
+    return binary;
+  }
+
+  /// Converts an EUI-64 Interface ID to its binary representation.
+  static String interfaceIDToBinary(String interfaceID) {
+    debugPrint('   interfaceIDToBinary called for: $interfaceID');
+    final binary = interfaceID
+        .replaceAll(':', '')
+        .split(RegExp(r'.{4}'))
+        .where((e) => e.isNotEmpty)
+        .map((hex) => int.parse(hex, radix: 16).toRadixString(2).padLeft(16, '0'))
+        .join(' ');
+    debugPrint('   interfaceIDToBinary result: $binary');
+    return binary;
+  }
+
+  /// Expands a compressed IPv6 address (with '::') to its full 8-hextet form.
+  static String expandIPv6(String ipv6) {
+    debugPrint('   expandIPv6 called for: $ipv6');
+    if (ipv6.contains('::')) {
+      final parts = ipv6.split('::');
+      final leftParts = parts[0].isNotEmpty ? parts[0].split(':') : [];
+      final rightParts = parts.length > 1 && parts[1].isNotEmpty ? parts[1].split(':') : [];
+
+      final missingParts = 8 - leftParts.length - rightParts.length;
+      final middleParts = List.filled(missingParts, '0000');
+
+      final allParts = [...leftParts, ...middleParts, ...rightParts];
+      final expanded = allParts.map((part) => part.padLeft(4, '0')).join(':');
+      debugPrint('   expandIPv6 result (with ::): $expanded');
+      return expanded;
+    }
+    final expanded = ipv6.split(':').map((part) => part.padLeft(4, '0')).join(':');
+    debugPrint('   expandIPv6 result (no ::): $expanded');
+    return expanded;
+  }
+
+  /// Compresses an IPv6 address by replacing the longest sequence of zero hextets with '::'.
+  static String compressIPv6(String ipv6) {
+    debugPrint('   compressIPv6 called for: $ipv6');
+    final parts = expandIPv6(ipv6).split(':');
+
+    int maxZeroStart = -1;
+    int maxZeroLength = 0;
+    int currentZeroStart = -1;
+    int currentZeroLength = 0;
+
+    for (int i = 0; i < parts.length; i++) {
+      if (int.tryParse(parts[i], radix: 16) == 0) {
+        if (currentZeroStart == -1) {
+          currentZeroStart = i;
+          currentZeroLength = 1;
+        } else {
+          currentZeroLength++;
+        }
+      } else {
+        if (currentZeroLength > maxZeroLength) {
+          maxZeroStart = currentZeroStart;
+          maxZeroLength = currentZeroLength;
+        }
+        currentZeroStart = -1;
+        currentZeroLength = 0;
+      }
+    }
+
+    if (currentZeroLength > maxZeroLength) {
+      maxZeroStart = currentZeroStart;
+      maxZeroLength = currentZeroLength;
+    }
+
+    String compressed;
+    if (maxZeroLength >= 2) { // Only compress if at least two zero hextets
+      final beforeZeros = parts.sublist(0, maxZeroStart);
+      final afterZeros = parts.sublist(maxZeroStart + maxZeroLength);
+
+      final cleanBefore = beforeZeros.map((part) => int.parse(part, radix: 16).toRadixString(16)).map((e) => e == '0' ? '0' : e).toList();
+      final cleanAfter = afterZeros.map((part) => int.parse(part, radix: 16).toRadixString(16)).map((e) => e == '0' ? '0' : e).toList();
+
+      if (maxZeroStart == 0 && (maxZeroStart + maxZeroLength == parts.length)) {
+          compressed = '::'; // Case where the entire address is zeros
+      } else if (maxZeroStart == 0) {
+        compressed = '::${cleanAfter.join(':')}';
+      } else if (maxZeroStart + maxZeroLength == parts.length) {
+        compressed = '${cleanBefore.join(':')}::';
+      } else {
+        compressed = '${cleanBefore.join(':')}::${cleanAfter.join(':')}';
+      }
+    } else {
+      compressed = parts.map((part) => int.parse(part, radix: 16).toRadixString(16)).map((e) => e == '0' ? '0' : e).join(':');
+    }
+    debugPrint('   compressIPv6 result: $compressed');
+    return compressed;
+  }
+
+  /// Converts an IPv6 address string (can be compressed) to a BigInt.
+  static BigInt _ipv6StringToBigInt(String ipv6String) {
+    final expanded = expandIPv6(ipv6String);
+    final hextets = expanded.split(':');
+    BigInt ipv6BigInt = BigInt.zero;
+    for (int i = 0; i < hextets.length; i++) {
+      ipv6BigInt = (ipv6BigInt << 16) | BigInt.parse(hextets[i], radix: 16);
+    }
+    return ipv6BigInt;
+  }
+
+  /// Converts a BigInt to a compressed IPv6 address string.
+  static String _bigIntToIPv6String(BigInt ipv6BigInt) {
+    List<String> parts = [];
+    for (int i = 0; i < 8; i++) {
+      // Extract 16 bits at a time (a hextet)
+      final hextet = (ipv6BigInt >> (112 - i * 16)).toInt() & 0xFFFF; // Correction ici: .toInt() avant & 0xFFFF
+      parts.add(hextet.toRadixString(16).padLeft(4, '0'));
+    }
+    // Compress the IPv6 address
+    return compressIPv6(parts.join(':'));
   }
 
   // EUI-64 Interface ID Generator functionality
@@ -188,33 +323,12 @@ class IpUtils {
     );
   }
 
-  static String macToBinary(String macAddress) {
-    debugPrint('   macToBinary called for: $macAddress');
-    final binary = macAddress
-        .replaceAll(RegExp(r'[:-]'), '')
-        .split(RegExp(r'.{2}'))
-        .where((e) => e.isNotEmpty)
-        .map((hex) => int.parse(hex, radix: 16).toRadixString(2).padLeft(8, '0'))
-        .join(' ');
-    debugPrint('   macToBinary result: $binary');
-    return binary;
-  }
-
-  static String interfaceIDToBinary(String interfaceID) {
-    debugPrint('   interfaceIDToBinary called for: $interfaceID');
-    final binary = interfaceID
-        .replaceAll(':', '')
-        .split(RegExp(r'.{4}'))
-        .where((e) => e.isNotEmpty)
-        .map((hex) => int.parse(hex, radix: 16).toRadixString(2).padLeft(16, '0'))
-        .join(' ');
-    debugPrint('   interfaceIDToBinary result: $binary');
-    return binary;
-  }
-
+  /// Generates a complete IPv6 address by combining a prefix and an interface ID.
   static String generateCompleteAddress(String prefix, String interfaceID) {
     debugPrint('   generateCompleteAddress called for prefix: $prefix, interfaceID: $interfaceID');
     final expandedPrefix = expandIPv6(prefix);
+    // Take the first 4 hextets (64 bits) of the prefix for a /64 common case
+    // This assumes the prefix is always /64 or shorter for EUI-64 combination
     final prefixParts = expandedPrefix.split(':').take(4).toList();
     final interfaceIDParts = interfaceID.split(':');
     final fullAddress = [...prefixParts, ...interfaceIDParts].join(':');
@@ -222,84 +336,8 @@ class IpUtils {
     return fullAddress;
   }
 
-  static String expandIPv6(String ipv6) {
-    debugPrint('   expandIPv6 called for: $ipv6');
-    if (ipv6.contains('::')) {
-      final parts = ipv6.split('::');
-      final leftParts = parts[0].isNotEmpty ? parts[0].split(':') : [];
-      final rightParts = parts.length > 1 && parts[1].isNotEmpty ? parts[1].split(':') : [];
 
-      final missingParts = 8 - leftParts.length - rightParts.length;
-      final middleParts = List.filled(missingParts, '0000');
-
-      final allParts = [...leftParts, ...middleParts, ...rightParts];
-      final expanded = allParts.map((part) => part.padLeft(4, '0')).join(':');
-      debugPrint('   expandIPv6 result (with ::): $expanded');
-      return expanded;
-    }
-    final expanded = ipv6.split(':').map((part) => part.padLeft(4, '0')).join(':');
-    debugPrint('   expandIPv6 result (no ::): $expanded');
-    return expanded;
-  }
-
-  static String compressIPv6(String ipv6) {
-    debugPrint('   compressIPv6 called for: $ipv6');
-    final parts = expandIPv6(ipv6).split(':');
-
-    int maxZeroStart = -1;
-    int maxZeroLength = 0;
-    int currentZeroStart = -1;
-    int currentZeroLength = 0;
-
-    for (int i = 0; i < parts.length; i++) {
-      if (int.tryParse(parts[i], radix: 16) == 0) {
-        if (currentZeroStart == -1) {
-          currentZeroStart = i;
-          currentZeroLength = 1;
-        } else {
-          currentZeroLength++;
-        }
-      } else {
-        if (currentZeroLength > maxZeroLength) {
-          maxZeroStart = currentZeroStart;
-          maxZeroLength = currentZeroLength;
-        }
-        currentZeroStart = -1;
-        currentZeroLength = 0;
-      }
-    }
-
-    if (currentZeroLength > maxZeroLength) {
-      maxZeroStart = currentZeroStart;
-      maxZeroLength = currentZeroLength;
-    }
-
-    String compressed;
-    if (maxZeroLength >= 2) {
-      final beforeZeros = parts.sublist(0, maxZeroStart);
-      final afterZeros = parts.sublist(maxZeroStart + maxZeroLength);
-
-      final cleanBefore = beforeZeros.map((part) => int.parse(part, radix: 16).toRadixString(16)).map((e) => e == '0' ? '0' : e).toList();
-      final cleanAfter = afterZeros.map((part) => int.parse(part, radix: 16).toRadixString(16)).map((e) => e == '0' ? '0' : e).toList();
-
-      if (maxZeroStart == 0 && (maxZeroStart + maxZeroLength == parts.length)) {
-          compressed = '::';
-      } else if (maxZeroStart == 0) {
-        compressed = '::${cleanAfter.join(':')}';
-      } else if (maxZeroStart + maxZeroLength == parts.length) {
-        compressed = '${cleanBefore.join(':')}::';
-      } else {
-        compressed = '${cleanBefore.join(':')}::${cleanAfter.join(':')}';
-      }
-    } else {
-      compressed = parts.map((part) => int.parse(part, radix: 16).toRadixString(16)).map((e) => e == '0' ? '0' : e).join(':');
-    }
-    debugPrint('   compressIPv6 result: $compressed');
-    return compressed;
-  }
-
-
-  // Analyseur IP (remplace l'ancien convertIp)
+  // IP Analyzer (replaces old convertIp)
   static IpAnalysisResult analyzeIp(String ipCidr, String ipVersion) {
     debugPrint('IpUtils.analyzeIp called with: $ipCidr, version: $ipVersion');
 
@@ -312,11 +350,10 @@ class IpUtils {
     final prefixLengthStr = parts[1].trim();
     final int prefixLength = int.tryParse(prefixLengthStr) ?? -1;
 
-    if (prefixLength == -1 || prefixLength < 0 || prefixLength > (ipVersion == 'IPv4' ? 32 : 128)) {
-      throw Exception('Longueur de préfixe invalide (0-${ipVersion == 'IPv4' ? 32 : 128}).');
-    }
-
     if (ipVersion == 'IPv4') {
+      if (prefixLength == -1 || prefixLength < 0 || prefixLength > 32) {
+        throw Exception('Longueur de préfixe invalide (0-32).');
+      }
       if (!validateIPv4(ipAddress)) {
         throw Exception('Adresse IPv4 invalide.');
       }
@@ -358,23 +395,54 @@ class IpUtils {
         totalHosts: totalHosts > 0 ? totalHosts : 0, // Ensure non-negative
       );
     } else if (ipVersion == 'IPv6') {
+      if (prefixLength == -1 || prefixLength < 0 || prefixLength > 128) {
+        throw Exception('Longueur de préfixe invalide (0-128).');
+      }
       if (!validateIPv6(ipAddress)) {
         throw Exception('Adresse IPv6 invalide.');
       }
       debugPrint('   Analyzing IPv6: $ipAddress/$prefixLength');
 
-      final ipBinary = ipv6ToBinary(ipAddress);
-      final expandedIpv6 = expandIPv6(ipAddress);
-      final compressedIpv6 = compressIPv6(ipAddress);
+      final ipBigInt = _ipv6StringToBigInt(ipAddress);
+
+      // Calculate the network mask (1s for network part, 0s for host part)
+      // Example: for /64, mask has 64 ones, then 64 zeros.
+      // We create a mask of zeros at the right, then invert it.
+      final BigInt hostBitsMask = (BigInt.one << (128 - prefixLength)) - BigInt.one;
+      final BigInt networkMask = ~hostBitsMask; // Invert to get 1s for network part
+
+      // Network Address: IP address ANDed with the network mask
+      final BigInt networkAddressBigInt = ipBigInt & networkMask;
+      final String networkAddress = _bigIntToIPv6String(networkAddressBigInt);
+
+      // First Usable Address: In IPv6, the network address itself is generally usable.
+      // We'll use the network address as the "first usable" for simplicity and common practice.
+      final String firstUsable = networkAddress;
+
+      // Last Usable Address: Network address ORed with the host bits mask (all host bits set to 1)
+      final BigInt lastUsableBigInt = networkAddressBigInt | hostBitsMask;
+      final String lastUsable = _bigIntToIPv6String(lastUsableBigInt);
+
+      // Total Hosts: 2^(128 - prefixLength)
+      // Note: No -2 for network/broadcast as in IPv4. All addresses are generally usable.
+      final BigInt totalAddressesBigInt = BigInt.one << (128 - prefixLength);
+      // Convert to a string, as it can be a very large number
+      final String totalAddresses = totalAddressesBigInt.toString();
+
 
       return IpAnalysisResult(
         originalIpCidr: ipCidr,
         ipVersion: ipVersion,
         ipAddress: ipAddress,
         prefixLength: prefixLengthStr,
-        ipBinary: formatBinary(ipBinary, groupSize: 16),
-        expandedIpv6: expandedIpv6,
-        compressedIpv6: compressedIpv6,
+        ipBinary: formatBinary(ipv6ToBinary(ipAddress), groupSize: 16),
+        expandedIpv6: expandIPv6(ipAddress),
+        compressedIpv6: compressIPv6(ipAddress),
+        // New IPv6 specific fields
+        networkAddressIPv6: networkAddress,
+        firstUsableIPv6: firstUsable,
+        lastUsableIPv6: lastUsable,
+        totalAddressesIPv6: totalAddresses,
       );
     } else {
       throw Exception('Version IP non supportée.');
@@ -413,7 +481,7 @@ class IpUtils {
     final bitsNeeded = (subnetCount > 0) ? (Math.log(subnetCount) / Math.log(2)).ceil() : 0;
     final newPrefix = prefixNum + bitsNeeded;
 
-    if (newPrefix > 30) {
+    if (newPrefix > 30) { // Max /30 for IPv4 usable hosts
       throw Exception('Pas assez de bits disponibles pour créer ces sous-réseaux');
     }
 

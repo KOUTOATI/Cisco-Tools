@@ -1,5 +1,4 @@
-// Assurez-vous que ce fichier contient déjà vos autres modèles comme IpAnalysisResult et EUI64Result
-import 'package:flutter/material.dart'; // Nécessaire pour debugPrint dans certains modèles si utilisé
+import 'package:flutter/material.dart'; // Keep if you use debugPrint or other Flutter specific functionalities in models.
 
 /// Modèle pour les résultats de l'analyse IP (IPv4 et IPv6).
 class IpAnalysisResult {
@@ -18,11 +17,15 @@ class IpAnalysisResult {
   final String? broadcastAddressBinary;
   final String? firstHost;
   final String? lastHost;
-  final int? totalHosts;
+  final int? totalHosts; // Ce champ est pour IPv4, et est bien un int?
 
   // IPv6 specific
   final String? expandedIpv6;
   final String? compressedIpv6;
+  final String? networkAddressIPv6; // Nouveau champ pour l'adresse réseau IPv6
+  final String? firstUsableIPv6;    // Nouveau champ pour la première adresse utilisable IPv6
+  final String? lastUsableIPv6;     // Nouveau champ pour la dernière adresse utilisable IPv6
+  final String? totalAddressesIPv6; // Nouveau champ pour le nombre total d'adresses IPv6 (String pour gérer les très grands nombres)
 
   IpAnalysisResult({
     required this.originalIpCidr,
@@ -41,6 +44,10 @@ class IpAnalysisResult {
     this.totalHosts,
     this.expandedIpv6,
     this.compressedIpv6,
+    this.networkAddressIPv6,
+    this.firstUsableIPv6,
+    this.lastUsableIPv6,
+    this.totalAddressesIPv6,
   });
 }
 
@@ -132,4 +139,32 @@ class VLSMResult {
     required this.efficiency,
     required this.subnets,
   });
+}
+
+/// Type d'enregistrement DNS (A, AAAA, MX, NS, TXT, CNAME, etc.)
+enum DnsRecordType { A, AAAA, MX, NS, TXT, CNAME, PTR, SRV, SOA, Unknown }
+
+/// Modèle pour un enregistrement DNS individuel.
+class DnsRecord {
+  final DnsRecordType type;
+  final String value;
+  final int? ttl; // Time-To-Live en secondes
+
+  DnsRecord({required this.type, required this.value, this.ttl});
+
+  @override
+  String toString() {
+    return 'Type: ${type.name}, Valeur: $value' + (ttl != null ? ', TTL: $ttl s' : '');
+  }
+}
+
+/// Modèle pour les résultats complets d'une recherche DNS.
+class DnsLookupResult {
+  final String domainName;
+  final List<DnsRecord> records;
+  final String? errorMessage;
+
+  DnsLookupResult({required this.domainName, required this.records, this.errorMessage});
+
+  bool get isSuccess => errorMessage == null;
 }
