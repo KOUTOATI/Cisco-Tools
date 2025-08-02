@@ -105,8 +105,8 @@ class _IpConverterScreenState extends State<IpConverterScreen> {
                       decoration: InputDecoration(
                         labelText: 'Entrez une adresse IP avec préfixe CIDR',
                         hintText: _selectedIpVersion == 'IPv4'
-                            ? 'ex: 192.168.1.0/24'
-                            : 'ex: 2001:db8::/64',
+                            ? 'ex: 172.158.1.0/24'
+                            : 'ex: 2001:db8:abcd::1/64',
                         prefixIcon: const Icon(Icons.network_check),
                       ),
                     ),
@@ -161,6 +161,11 @@ class _IpConverterScreenState extends State<IpConverterScreen> {
                         'IP Binaire': _result!.ipBinary,
                         'IPv6 Étendue': _result!.expandedIpv6!,
                         'IPv6 Compressée': _result!.compressedIpv6!,
+                        // Nouveaux champs pour IPv6, affichés même s'ils sont null (avec 'N/A')
+                        'Adresse Réseau IPv6': _result!.networkAddressIPv6 ?? 'N/A',
+                        'Première Adresse Utilisable': _result!.firstUsableIPv6 ?? 'N/A',
+                        'Dernière Adresse Utilisable': _result!.lastUsableIPv6 ?? 'N/A',
+                        'Nombre Total d\'Adresses': _result!.totalAddressesIPv6 ?? 'N/A',
                       },
                     ),
           ],

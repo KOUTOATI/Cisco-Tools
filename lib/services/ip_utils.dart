@@ -247,7 +247,7 @@ class IpUtils {
     List<String> parts = [];
     for (int i = 0; i < 8; i++) {
       // Extract 16 bits at a time (a hextet)
-      final hextet = (ipv6BigInt >> (112 - i * 16)).toInt() & 0xFFFF; // Correction ici: .toInt() avant & 0xFFFF
+      final int hextet = ((ipv6BigInt >> (112 - i * 16)) & BigInt.from(0xFFFF)).toInt();
       parts.add(hextet.toRadixString(16).padLeft(4, '0'));
     }
     // Compress the IPv6 address
@@ -359,23 +359,23 @@ class IpUtils {
       }
       debugPrint('   Analyzing IPv4: $ipAddress/$prefixLength');
 
-      final ipBinary = ipv4ToBinary(ipAddress);
-      final subnetMaskBinary = ''.padLeft(prefixLength, '1').padRight(32, '0');
-      final subnetMask = binaryToIPv4(subnetMaskBinary);
+      final String ipBinary = ipv4ToBinary(ipAddress);
+      final String subnetMaskBinary = ''.padLeft(prefixLength, '1').padRight(32, '0');
+      final String subnetMask = binaryToIPv4(subnetMaskBinary);
 
-      final networkAddressBinary = (int.parse(ipBinary, radix: 2) & int.parse(subnetMaskBinary, radix: 2))
+      final String networkAddressBinary = (int.parse(ipBinary, radix: 2) & int.parse(subnetMaskBinary, radix: 2))
           .toRadixString(2)
           .padLeft(32, '0');
-      final networkAddress = binaryToIPv4(networkAddressBinary);
+      final String networkAddress = binaryToIPv4(networkAddressBinary);
 
-      final broadcastAddressBinary = (int.parse(networkAddressBinary, radix: 2) | (~int.parse(subnetMaskBinary, radix: 2) & 0xFFFFFFFF))
+      final String broadcastAddressBinary = (int.parse(networkAddressBinary, radix: 2) | (~int.parse(subnetMaskBinary, radix: 2) & 0xFFFFFFFF))
           .toRadixString(2)
           .padLeft(32, '0');
-      final broadcastAddress = binaryToIPv4(broadcastAddressBinary);
+      final String broadcastAddress = binaryToIPv4(broadcastAddressBinary);
 
       final int totalHosts = (1 << (32 - prefixLength)) - 2; // -2 for network and broadcast
-      final firstHost = (totalHosts > 0) ? binaryToIPv4((int.parse(networkAddressBinary, radix: 2) + 1).toRadixString(2).padLeft(32, '0')) : 'N/A';
-      final lastHost = (totalHosts > 0) ? binaryToIPv4((int.parse(broadcastAddressBinary, radix: 2) - 1).toRadixString(2).padLeft(32, '0')) : 'N/A';
+      final String firstHost = (totalHosts > 0) ? binaryToIPv4((int.parse(networkAddressBinary, radix: 2) + 1).toRadixString(2).padLeft(32, '0')) : 'N/A';
+      final String lastHost = (totalHosts > 0) ? binaryToIPv4((int.parse(broadcastAddressBinary, radix: 2) - 1).toRadixString(2).padLeft(32, '0')) : 'N/A';
 
 
       return IpAnalysisResult(
@@ -406,8 +406,6 @@ class IpUtils {
       final ipBigInt = _ipv6StringToBigInt(ipAddress);
 
       // Calculate the network mask (1s for network part, 0s for host part)
-      // Example: for /64, mask has 64 ones, then 64 zeros.
-      // We create a mask of zeros at the right, then invert it.
       final BigInt hostBitsMask = (BigInt.one << (128 - prefixLength)) - BigInt.one;
       final BigInt networkMask = ~hostBitsMask; // Invert to get 1s for network part
 
@@ -416,18 +414,29 @@ class IpUtils {
       final String networkAddress = _bigIntToIPv6String(networkAddressBigInt);
 
       // First Usable Address: In IPv6, the network address itself is generally usable.
-      // We'll use the network address as the "first usable" for simplicity and common practice.
-      final String firstUsable = networkAddress;
+      final String firstUsable = networkAddress; // For IPv6, the network address is usually the first usable.
 
       // Last Usable Address: Network address ORed with the host bits mask (all host bits set to 1)
       final BigInt lastUsableBigInt = networkAddressBigInt | hostBitsMask;
       final String lastUsable = _bigIntToIPv6String(lastUsableBigInt);
 
-      // Total Hosts: 2^(128 - prefixLength)
-      // Note: No -2 for network/broadcast as in IPv4. All addresses are generally usable.
+      // Total Addresses: 2^(128 - prefixLength)
       final BigInt totalAddressesBigInt = BigInt.one << (128 - prefixLength);
-      // Convert to a string, as it can be a very large number
       final String totalAddresses = totalAddressesBigInt.toString();
+
+      // --- DEBUG PRINTS POUR IPv6 ---
+      debugPrint('   IPv6 Analysis Results (Debug):');
+      debugPrint('     IP BigInt: $ipBigInt');
+      debugPrint('     Host Bits Mask: $hostBitsMask');
+      debugPrint('     Network Mask: $networkMask');
+      debugPrint('     Network Address BigInt: $networkAddressBigInt');
+      debugPrint('     Calculated Network Address: $networkAddress');
+      debugPrint('     Calculated First Usable: $firstUsable');
+      debugPrint('     Last Usable BigInt: $lastUsableBigInt');
+      debugPrint('     Calculated Last Usable: $lastUsable');
+      debugPrint('     Total Addresses BigInt: $totalAddressesBigInt');
+      debugPrint('     Calculated Total Addresses: $totalAddresses');
+      // --- FIN DEBUG PRINTS ---
 
 
       return IpAnalysisResult(
