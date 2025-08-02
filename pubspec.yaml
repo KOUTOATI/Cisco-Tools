@@ -11,12 +11,27 @@ dependencies:
     sdk: flutter
   provider: ^6.0.5 
     
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^2.0.0
+  flutter_launcher_icons: "^0.13.1" # Utilisez la version stable recommandée
 
+# La configuration de flutter_launcher_icons doit être ici,
+# avec la bonne indentation (2 espaces par niveau)
+flutter_launcher_icons:
+  android: "launcher_icon" # Nom de l'icône pour Android
+  ios: true # Générer l'icône pour iOS
+  image_path: "assets/app_icon/app_icon.png" # Chemin vers votre image d'icône
+  min_sdk_android: 21 # Version minimale du SDK Android supportée par votre application
+  remove_alpha_ios: true 
+  # Si vous utilisez des icônes adaptatives pour Android (recommandé pour les nouvelles apps)
+  # décommentez et configurez ces lignes :
+  adaptive_icon_background: "#0A1E2E" # Couleur de fond
+  adaptive_icon_foreground: "assets/app_icon/app_icon.png" # Image de premier plan
+
+
+  
 flutter:
 
   uses-material-design: true

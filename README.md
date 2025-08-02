@@ -1,5 +1,5 @@
-IPCalculator
-IPCalculator est une application mobile développée avec Flutter, conçue pour simplifier et résoudre divers problèmes liés au réseau, notamment l'analyse d'adresses IP, la gestion des plages d'adresses, la génération d'ID d'interface IPv6 et le sous-réseautage (VLSM), ainsi que la recherche d'informations DNS.
+IPCalc
+IPCalc est une application mobile développée avec Flutter, conçue pour simplifier et résoudre divers problèmes liés au réseau, notamment l'analyse d'adresses IP, la gestion des plages d'adresses, la génération d'ID d'interface IPv6 et le sous-réseautage (VLSM), ainsi que la recherche d'informations DNS.
 
 🚀 Fonctionnalités
 Cette application offre des outils essentiels pour les professionnels et les étudiants en réseau :
@@ -13,18 +13,18 @@ Sous-réseautage (VLSM & Classique) : Effectuez des calculs de Variable Length S
 Recherche DNS : Effectuez des recherches d'enregistrements DNS (A, AAAA, MX, NS, TXT) pour un nom de domaine donné. (Note : La fonctionnalité de recherche DNS réelle peut être limitée en environnement web/Canvas pour des raisons de sécurité du navigateur et nécessiterait une application native pour un fonctionnement complet).
 
 📱 Installation
-L'application IPCalculator est disponible sur le Google Play Store. Pour l'installer, il vous suffit de :
+L'application IPCalc est disponible sur le Google Play Store. Pour l'installer, il vous suffit de :
 
 Ouvrir l'application Google Play Store sur votre appareil Android.
 
-Rechercher "IPCalculator".
+Rechercher "IPCalc".
 
 Cliquer sur "Installer" et suivre les instructions à l'écran.
 
 Une fois téléchargée, l'application s'installera comme n'importe quelle autre application mobile.
 
 💡 Utilisation
-L'interface de IPCalculator est intuitive et facile à utiliser :
+L'interface de IPCalc est intuitive et facile à utiliser :
 
 Pour l'Analyseur IP (IPv4 & IPv6) :
 
