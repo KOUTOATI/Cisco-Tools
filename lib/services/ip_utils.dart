@@ -121,7 +121,7 @@ class IpUtils {
 
     final ipv6 = hextets.map((hextet) {
       if (hextet.isEmpty) return '0'; // Should not happen with padLeft, but for safety
-      return int.parse(hextet, radix: 2).toRadixString(16).padLeft(4, '0');
+      return int.parse(hextet, radix: 16).toRadixString(16).padLeft(4, '0');
     }).join(':');
     debugPrint('   binaryToIPv6 result: $ipv6');
     return ipv6;
@@ -464,48 +464,70 @@ class IpUtils {
   /// Retourne un objet `ClassicSubnetResult` contenant le résumé et la liste des sous-réseaux.
   static ClassicSubnetResult calculateClassicSubnet(
       String networkAddress, int subnetCount) {
+    debugPrint('--- Début du calcul de sous-réseautage classique ---');
+    debugPrint('Adresse réseau d\'entrée: $networkAddress, Nombre de sous-réseaux souhaités: $subnetCount');
+
     final parts = networkAddress.split('/');
     if (parts.length != 2) {
       throw Exception('Format d\'adresse réseau invalide (doit être IP/CIDR)');
     }
 
-    final network = parts[0];
-    final prefix = parts[1];
+    final originalIp = parts[0];
+    final originalPrefixStr = parts[1];
 
     // Valider les entrées
-    if (!validateIPv4(network)) {
+    if (!validateIPv4(originalIp)) {
       throw Exception('Format d\'adresse réseau invalide');
     }
 
-    final prefixNum = int.tryParse(prefix);
-    if (prefixNum == null || prefixNum < 0 || prefixNum > 30) {
+    final originalPrefixNum = int.tryParse(originalPrefixStr);
+    if (originalPrefixNum == null || originalPrefixNum < 0 || originalPrefixNum > 30) {
       throw Exception('Préfixe invalide (doit être entre 0 et 30)');
     }
+    debugPrint('Préfixe original: $originalPrefixNum');
+
 
     if (subnetCount < 2) {
       throw Exception('Nombre de sous-réseaux invalide (minimum 2)');
     }
 
+    // Calculer l'adresse réseau réelle de l'IP originale fournie
+    final originalIpBinary = ipv4ToBinary(originalIp);
+    final originalNetworkMaskBinary = ''.padLeft(originalPrefixNum, '1').padRight(32, '0');
+    final actualNetworkAddressInt = (int.parse(originalIpBinary, radix: 2) & int.parse(originalNetworkMaskBinary, radix: 2));
+    final actualNetworkAddressString = binaryToIPv4(actualNetworkAddressInt.toRadixString(2).padLeft(32, '0'));
+
+    debugPrint('Adresse IP d\'entrée binaire: $originalIpBinary');
+    debugPrint('Masque réseau original binaire: ${formatBinary(originalNetworkMaskBinary)}');
+    debugPrint('Adresse réseau calculée (base pour les sous-réseaux): $actualNetworkAddressString');
+    debugPrint('Adresse réseau entière calculée (base pour les sous-réseaux): $actualNetworkAddressInt');
+
+
     // Calculer les bits nécessaires pour les sous-réseaux
     final bitsNeeded = (subnetCount > 0) ? (Math.log(subnetCount) / Math.log(2)).ceil() : 0;
-    final newPrefix = prefixNum + bitsNeeded;
+    final newPrefix = originalPrefixNum + bitsNeeded;
+
+    debugPrint('Bits nécessaires pour les sous-réseaux: $bitsNeeded');
+    debugPrint('Nouveau préfixe (CIDR): /$newPrefix');
+
 
     if (newPrefix > 30) { // Max /30 for IPv4 usable hosts
-      throw Exception('Pas assez de bits disponibles pour créer ces sous-réseaux');
+      throw Exception('Pas assez de bits disponibles pour créer ces sous-réseaux avec des hôtes utilisables (max /30).');
     }
 
     // Calculer la taille du sous-réseau et le nombre d'hôtes
     final hostsPerSubnet = (Math.pow(2, 32 - newPrefix) - 2).toInt();
     final subnetSize = (Math.pow(2, 32 - newPrefix)).toInt();
 
-    // Générer les sous-réseaux
-    final networkBinary = ipv4ToBinary(network);
-    final networkInt = int.parse(networkBinary, radix: 2);
+    debugPrint('Taille du sous-réseau (nombre total d\'adresses par sous-réseau): $subnetSize');
+    debugPrint('Hôtes utilisables par sous-réseau: $hostsPerSubnet');
 
+
+    // Générer les sous-réseaux
     List<CalculatedSubnetInfo> subnets = [];
 
     for (int i = 0; i < subnetCount; i++) {
-      final subnetNetworkInt = networkInt + (i * subnetSize);
+      final subnetNetworkInt = actualNetworkAddressInt + (i * subnetSize);
       final subnetNetworkBinary = subnetNetworkInt.toRadixString(2).padLeft(32, '0');
       final subnetNetwork = binaryToIPv4(subnetNetworkBinary);
 
@@ -513,13 +535,28 @@ class IpUtils {
       final broadcastBinary = broadcastInt.toRadixString(2).padLeft(32, '0');
       final broadcast = binaryToIPv4(broadcastBinary);
 
-      final firstUsableInt = subnetNetworkInt + 1;
-      final firstUsableBinary = firstUsableInt.toRadixString(2).padLeft(32, '0');
-      final firstUsable = binaryToIPv4(firstUsableBinary);
+      String firstUsable = 'N/A';
+      String lastUsable = 'N/A';
 
-      final lastUsableInt = broadcastInt - 1;
-      final lastUsableBinary = lastUsableInt.toRadixString(2).padLeft(32, '0');
-      final lastUsable = binaryToIPv4(lastUsableBinary);
+      // Seulement si il y a des hôtes utilisables
+      if (hostsPerSubnet > 0) {
+        final firstUsableInt = subnetNetworkInt + 1;
+        firstUsable = binaryToIPv4(firstUsableInt.toRadixString(2).padLeft(32, '0'));
+
+        final lastUsableInt = broadcastInt - 1;
+        lastUsable = binaryToIPv4(lastUsableInt.toRadixString(2).padLeft(32, '0'));
+      }
+
+
+      debugPrint('--- Sous-réseau ${i + 1} ---');
+      debugPrint('  Adresse réseau (int): $subnetNetworkInt');
+      debugPrint('  Adresse réseau: $subnetNetwork/$newPrefix');
+      debugPrint('  Adresse de diffusion (int): $broadcastInt');
+      debugPrint('  Adresse de diffusion: $broadcast');
+      debugPrint('  Première hôte utilisable: $firstUsable');
+      debugPrint('  Dernière hôte utilisable: $lastUsable');
+      debugPrint('  Hôtes disponibles: $hostsPerSubnet');
+
 
       subnets.add(CalculatedSubnetInfo(
         name: 'Sous-réseau ${i + 1}', // Nom générique pour le classique
@@ -531,6 +568,7 @@ class IpUtils {
         requestedHosts: hostsPerSubnet, // Pour la cohérence avec VLSM
       ));
     }
+    debugPrint('--- Fin du calcul de sous-réseautage classique ---');
 
     return ClassicSubnetResult(
       originalNetwork: networkAddress,
@@ -548,6 +586,10 @@ class IpUtils {
   /// Retourne un objet `VLSMResult` contenant le résumé et la liste des sous-réseaux calculés.
   static VLSMResult calculateVLSM(
       String networkAddress, List<VLSMRequirement> requirements) {
+    debugPrint('--- Début du calcul VLSM ---');
+    debugPrint('Adresse réseau d\'entrée: $networkAddress');
+    debugPrint('Besoins VLSM: ${requirements.map((r) => '${r.name}: ${r.hosts} hôtes').join(', ')}');
+
     final parts = networkAddress.split('/');
     if (parts.length != 2) {
       throw Exception('Format d\'adresse réseau invalide (doit être IP/CIDR)');
@@ -565,6 +607,8 @@ class IpUtils {
     if (prefixNum == null || prefixNum < 0 || prefixNum > 30) {
       throw Exception('Préfixe invalide (doit être entre 0 et 30)');
     }
+    debugPrint('Préfixe initial: $prefixNum');
+
 
     if (requirements.isEmpty) {
       throw Exception('Veuillez ajouter au moins un besoin de sous-réseau');
@@ -572,24 +616,38 @@ class IpUtils {
 
     // Trier les besoins par nombre d'hôtes (décroissant)
     requirements.sort((a, b) => b.hosts.compareTo(a.hosts));
+    debugPrint('Besoins triés: ${requirements.map((r) => '${r.name}: ${r.hosts} hôtes').join(', ')}');
+
 
     final networkBinary = ipv4ToBinary(network);
     final networkInt = int.parse(networkBinary, radix: 2);
     int currentAddress = networkInt;
 
+    debugPrint('Adresse réseau binaire initiale: $networkBinary');
+    debugPrint('Adresse réseau entière initiale: $networkInt');
+
     List<CalculatedSubnetInfo> subnets = [];
     int totalUsedAddresses = 0;
 
     for (var req in requirements) {
+      debugPrint('--- Traitement du besoin: ${req.name} (${req.hosts} hôtes) ---');
       // Calculer la taille de sous-réseau requise (puissance de 2)
       // +2 pour l'adresse réseau et l'adresse de diffusion
       final requiredSize = (Math.pow(2, (Math.log(req.hosts + 2) / Math.log(2)).ceil())).toInt();
       final subnetBits = 32 - (Math.log(requiredSize) / Math.log(2)).toInt();
 
+      debugPrint('  Taille de sous-réseau requise (puissance de 2): $requiredSize');
+      debugPrint('  Nouveau préfixe pour ce sous-réseau: /$subnetBits');
+
+
       if (subnetBits < prefixNum) {
         throw Exception(
-            'Pas assez d\'espace pour le réseau "${req.name}" (${req.hosts} hôtes)');
+            'Pas assez d\'espace pour le réseau "${req.name}" (${req.hosts} hôtes) avec le préfixe initial.');
       }
+      if (subnetBits > 30) { // Max /30 for IPv4 usable hosts
+        throw Exception('Le sous-réseau "${req.name}" nécessite un préfixe supérieur à /30, pas d\'hôtes utilisables.');
+      }
+
 
       // Calculer les adresses
       final subnetNetworkBinary = currentAddress.toRadixString(2).padLeft(32, '0');
@@ -599,10 +657,24 @@ class IpUtils {
       final broadcastBinary = broadcastInt.toRadixString(2).padLeft(32, '0');
       final broadcast = binaryToIPv4(broadcastBinary);
 
-      final firstUsable = binaryToIPv4((currentAddress + 1).toRadixString(2).padLeft(32, '0'));
-      final lastUsable = binaryToIPv4((broadcastInt - 1).toRadixString(2).padLeft(32, '0'));
-
+      String firstUsable = 'N/A';
+      String lastUsable = 'N/A';
       final actualHosts = requiredSize - 2;
+
+      if (actualHosts > 0) {
+        final firstUsableInt = currentAddress + 1;
+        firstUsable = binaryToIPv4(firstUsableInt.toRadixString(2).padLeft(32, '0'));
+
+        final lastUsableInt = broadcastInt - 1;
+        lastUsable = binaryToIPv4(lastUsableInt.toRadixString(2).padLeft(32, '0'));
+      }
+
+      debugPrint('  Adresse réseau calculée: $subnetNetwork/$subnetBits');
+      debugPrint('  Adresse de diffusion calculée: $broadcast');
+      debugPrint('  Première hôte utilisable: $firstUsable');
+      debugPrint('  Dernière hôte utilisable: $lastUsable');
+      debugPrint('  Hôtes disponibles: $actualHosts');
+
 
       subnets.add(CalculatedSubnetInfo(
         name: req.name,
@@ -616,11 +688,20 @@ class IpUtils {
 
       currentAddress += requiredSize;
       totalUsedAddresses += requiredSize;
+      debugPrint('  Prochaine adresse de départ (int): $currentAddress');
     }
 
     final totalAvailable = (Math.pow(2, 32 - prefixNum)).toInt();
     final remainingAddresses = totalAvailable - totalUsedAddresses;
     final efficiency = (totalUsedAddresses / totalAvailable) * 100;
+
+    debugPrint('--- Résumé VLSM ---');
+    debugPrint('Total adresses disponibles dans le réseau initial: $totalAvailable');
+    debugPrint('Total adresses utilisées par les sous-réseaux: $totalUsedAddresses');
+    debugPrint('Adresses restantes: $remainingAddresses');
+    debugPrint('Efficacité: ${efficiency.toStringAsFixed(2)}%');
+    debugPrint('--- Fin du calcul VLSM ---');
+
 
     return VLSMResult(
       originalNetwork: networkAddress,
