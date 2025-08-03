@@ -510,13 +510,22 @@ class IpUtils {
     debugPrint('Taille du sous-réseau (nombre total d\'adresses par sous-réseau): $subnetSize');
     debugPrint('Hôtes utilisables par sous-réseau: $hostsPerSubnet');
 
-    // Calculer l'adresse réseau de départ basée sur l'IP originale ET le NOUVEAU masque
+    // Normalisation de l'adresse IP d'origine à son adresse réseau
     final originalIpBinary = ipv4ToBinary(originalIp);
-    final newSubnetMaskBinary = ''.padLeft(newPrefix, '1').padRight(32, '0');
-    final initialSubnetNetworkInt = (int.parse(originalIpBinary, radix: 2) & int.parse(newSubnetMaskBinary, radix: 2));
-    final initialSubnetNetworkString = binaryToIPv4(initialSubnetNetworkInt.toRadixString(2).padLeft(32, '0'));
+    final originalNetworkMaskBinary = ''.padLeft(originalPrefixNum, '1').padRight(32, '0');
+    final originalNetworkAddressInt = (int.parse(originalIpBinary, radix: 2) & int.parse(originalNetworkMaskBinary, radix: 2));
+    final originalNetworkAddressString = binaryToIPv4(originalNetworkAddressInt.toRadixString(2).padLeft(32, '0'));
 
     debugPrint('Adresse IP d\'entrée binaire: $originalIpBinary');
+    debugPrint('Masque réseau original binaire: ${formatBinary(originalNetworkMaskBinary)}');
+    debugPrint('Adresse réseau normalisée de l\'original: $originalNetworkAddressString');
+
+
+    // Calculer l'adresse réseau de départ basée sur l'adresse réseau normalisée ET le NOUVEAU masque
+    final newSubnetMaskBinary = ''.padLeft(newPrefix, '1').padRight(32, '0');
+    final initialSubnetNetworkInt = (originalNetworkAddressInt & int.parse(newSubnetMaskBinary, radix: 2));
+    final initialSubnetNetworkString = binaryToIPv4(initialSubnetNetworkInt.toRadixString(2).padLeft(32, '0'));
+
     debugPrint('Nouveau masque réseau binaire: ${formatBinary(newSubnetMaskBinary)}');
     debugPrint('Adresse réseau calculée (base pour les sous-réseaux): $initialSubnetNetworkString');
     debugPrint('Adresse réseau entière calculée (base pour les sous-réseaux): $initialSubnetNetworkInt');
@@ -570,7 +579,7 @@ class IpUtils {
     debugPrint('--- Fin du calcul de sous-réseautage classique ---');
 
     return ClassicSubnetResult(
-      originalNetwork: networkAddress,
+      originalNetwork: '$originalNetworkAddressString/$originalPrefixNum', // Affiche l'adresse réseau normalisée
       newPrefix: newPrefix,
       bitsBorrowed: bitsNeeded,
       subnetsCreated: subnetCount,
@@ -613,12 +622,20 @@ class IpUtils {
       throw Exception('Veuillez ajouter au moins un besoin de sous-réseau');
     }
 
+    // Normalisation de l'adresse IP d'origine à son adresse réseau
+    final originalIpBinary = ipv4ToBinary(originalIp);
+    final originalNetworkMaskBinary = ''.padLeft(originalPrefixNum, '1').padRight(32, '0');
+    final originalNetworkAddressInt = (int.parse(originalIpBinary, radix: 2) & int.parse(originalNetworkMaskBinary, radix: 2));
+    final originalNetworkAddressString = binaryToIPv4(originalNetworkAddressInt.toRadixString(2).padLeft(32, '0'));
+
+    debugPrint('VLSM: Adresse IP d\'entrée binaire: $originalIpBinary');
+    debugPrint('VLSM: Masque réseau original binaire: ${formatBinary(originalNetworkMaskBinary)}');
+    debugPrint('VLSM: Adresse réseau normalisée de l\'original: $originalNetworkAddressString');
+
+
     // Trier les besoins par nombre d'hôtes (décroissant)
     requirements.sort((a, b) => b.hosts.compareTo(a.hosts));
     debugPrint('Besoins triés: ${requirements.map((r) => '${r.name}: ${r.hosts} hôtes').join(', ')}');
-
-    // NOUVEAU: Calculer l'adresse réseau de départ basée sur l'IP originale ET le masque du PREMIER sous-réseau VLSM
-    final originalIpBinary = ipv4ToBinary(originalIp);
 
     // Déterminer le préfixe du premier (plus grand) sous-réseau VLSM
     final firstReq = requirements[0];
@@ -626,7 +643,8 @@ class IpUtils {
     final firstSubnetPrefix = 32 - (Math.log(firstSubnetRequiredSize) / Math.log(2)).toInt();
 
     final firstSubnetMaskBinary = ''.padLeft(firstSubnetPrefix, '1').padRight(32, '0');
-    final initialVLSMNetworkInt = (int.parse(originalIpBinary, radix: 2) & int.parse(firstSubnetMaskBinary, radix: 2));
+    // Utiliser l'adresse réseau normalisée comme base pour le premier sous-réseau VLSM
+    final initialVLSMNetworkInt = (originalNetworkAddressInt & int.parse(firstSubnetMaskBinary, radix: 2));
 
     int currentAddress = initialVLSMNetworkInt; // Utilise la nouvelle base pour VLSM
 
@@ -715,7 +733,7 @@ class IpUtils {
 
 
     return VLSMResult(
-      originalNetwork: networkAddress,
+      originalNetwork: '$originalNetworkAddressString/$originalPrefixNum', // Affiche l'adresse réseau normalisée
       subnetsCreated: requirements.length,
       usedAddresses: totalUsedAddresses,
       remainingAddresses: remainingAddresses,
